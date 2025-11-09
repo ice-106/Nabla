@@ -1,0 +1,3 @@
+[submodule "utils/Extraction/SMPler-X"]
+	path = utils/Extraction/SMPler-X
+	url = https://github.com/SMPLCap/SMPLer-X.git
