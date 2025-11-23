@@ -25,7 +25,7 @@ case $ALGORITHM in
 esac
 
 # Iterate through all videos in the data/val_videos folder
-for video in "$VIDEO_DIR"/*; do
+find "$VIDEO_DIR" -type f | while IFS= read -r video; do
     # Skip if not a file
     if [ ! -f "$video" ]; then
         continue
