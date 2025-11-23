@@ -1,9 +1,6 @@
 #!/bin/bash
 set -x
 
-VIDEO_PATH=$1
-INPUT_VIDEO=$(echo "$VIDEO_PATH" | sed -E 's|.*data/val_videos/||; s|\.[^.]+$||')
-
 echo "Start infering mesh model with SMPLer-X"
 conda create -n smplerx python=3.8 -y
 
@@ -37,5 +34,3 @@ cat ../../../patches/SMPLer-X/slurm_inference.sh > main/slurm_inference.sh
 
 # Patch mask conversion compatibility issue in PyTorch
 cat ../../../patches/SMPLer-X/conversions.py > /usr/local/envs/smplerx/lib/python3.8/site-packages/torchgeometry/core/conversions.py
-
-cd main

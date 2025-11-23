@@ -8,7 +8,7 @@ FORMAT=$2
 FPS=$3
 CKPT=$4
 
-GPUS=1
+GPUS=2
 JOB_NAME=inference_${INPUT_VIDEO}
 
 GPUS_PER_NODE=$((${GPUS}<8?${GPUS}:8))

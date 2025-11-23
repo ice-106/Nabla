@@ -38,45 +38,6 @@ def main():
         print(f"✓ Successfully extracted to: {config['destination_folder']}")  
         os.system(f"rm {val_zip_path}")
 
-        
-
-
-
-
-
-
-# Example usage:
 if __name__ == "__main__":
-    # gdown.download('https://drive.google.com/file/d/1hEocwdsGE9nhrym6P-9uf0rOvXAwATbC/view?usp=sharing', 'val_videos.zip', fuzzy=True)
-    # val_videos = config["video_url"]
-    # destination_folder = config["destination_folder"]
-    # print(f"Video URL: {val_videos}")
-    # print(f"Destination Folder: {destination_folder}")
-
     main()
     
-    # file_id = extract_file_id(val_videos)
-    # print(f"Extracted file ID: {file_id}")
-
-    # downloaded_file = download_from_gdrive(
-    #     file_id=file_id,
-    #     output_path=destination_folder,
-    #     filename=config["filename"]
-    # )
-
-    # if downloaded_file:
-    #     print(f"Downloaded file path: {downloaded_file}")
-
-    #     # Extract the zip file
-    #     if downloaded_file.endswith('.zip'):
-    #         extract_to = os.path.join(destination_folder, 'extracted')
-    #         os.makedirs(extract_to, exist_ok=True)
-
-    #         try:
-    #             with zipfile.ZipFile(downloaded_file, 'r') as zip_ref:
-    #                 zip_ref.extractall(extract_to)
-    #             print(f"✓ Successfully extracted to: {extract_to}")
-    #         except Exception as e:
-    #             print(f"✗ Error extracting file: {str(e)}")
-
-
