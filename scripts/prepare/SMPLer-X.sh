@@ -16,7 +16,6 @@ conda run -n smplerx pip install -v -e .
 cd ../..
     
 mkdir -p demo/videos
-cp $VIDEO_PATH demo/videos/$INPUT_VIDEO.mp4
 
 # Download necessary files for SMPLer-X inference
 pip install huggingface_hub
@@ -40,6 +39,3 @@ cat ../../../patches/SMPLer-X/slurm_inference.sh > main/slurm_inference.sh
 cat ../../../patches/SMPLer-X/conversions.py > /usr/local/envs/smplerx/lib/python3.8/site-packages/torchgeometry/core/conversions.py
 
 cd main
-pwd 
-ls -la
-sh slurm_inference.sh $INPUT_VIDEO mp4 30 smpler_x_h32
