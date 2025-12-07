@@ -14,7 +14,7 @@ fi
 case $ALGORITHM in
   "SMPLer-X")
     echo "Using SMPLer-X for inference"
-    sh scripts/prepare/SMPLer-X.sh "$VIDEO_DIR"
+    bash scripts/prepare/SMPLer-X.sh "$VIDEO_DIR"
     ;;
   "SMPLest-X")
     echo "Using SMPLest-X for inference" 
@@ -38,10 +38,10 @@ find "$VIDEO_DIR" -type f -print0 | while IFS= read -r -d '' video; do
     case $ALGORITHM in
       "SMPLer-X")
         cp "$video" utils/extraction/SMPLer-X/demo/videos/$input_video.mp4
-        sh utils/extraction/SMPLer-X/main/slurm_inference.sh "$input_video" mp4 30 smpler_x_h32
+        bash utils/extraction/SMPLer-X/main/slurm_inference.sh "$input_video" mp4 30 smpler_x_h32
         ;;
       "SMPLest-X")
-        sh scripts/inference/SMPLest-X.sh "$video"
+        bash scripts/inference/SMPLest-X.sh "$video"
         ;;
       *)
         echo "Unsupported algorithm: $ALGORITHM"
