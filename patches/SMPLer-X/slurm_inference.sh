@@ -8,7 +8,7 @@ FORMAT=$2
 FPS=$3
 CKPT=$4
 
-GPUS=2
+GPUS=1
 JOB_NAME=inference_${INPUT_VIDEO}
 
 GPUS_PER_NODE=$((${GPUS}<8?${GPUS}:8))
@@ -23,7 +23,7 @@ SAVE_DIR=../demo/results/${INPUT_VIDEO}
 # video to images
 mkdir -p $IMG_PATH
 mkdir -p $SAVE_DIR
-ffmpeg -i ../demo/videos/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -qscale 0 ../demo/images/${INPUT_VIDEO}/%06d.jpg 
+ffmpeg -n -i ../demo/videos/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -q:v 0 ../demo/images/${INPUT_VIDEO}/%06d.jpg < /dev/null 
 
 end_count=$(find "$IMG_PATH" -type f | wc -l)
 echo $end_count
