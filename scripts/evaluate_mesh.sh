@@ -10,20 +10,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 EVAL_PY="$PROJECT_ROOT/utils/Evaluation/mesh_evaluation.py"
 
-usage() {
-    cat <<EOF
-Usage: $(basename "$0") --gt <gt_dir> --pred <pred_dir> --outdir <outdir> [-- additional args]
-
-Example:
-    $(basename "$0") --gt data/test/gt --pred data/test/pred --outdir data/outdir
-
-This script locates the evaluation script at:
-    $EVAL_PY
-and runs it with the provided arguments.
-EOF
-    exit 1
-}
-
 # Parse arguments
 GT=$1
 PRED=$2
