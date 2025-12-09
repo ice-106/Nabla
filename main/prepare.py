@@ -34,7 +34,7 @@ def main():
     if not osp.exists(val_zip_path):
         print(f"✗ File not found: {val_zip_path}")
         return
-    if os.system(f"unzip {val_zip_path} -d {config['destination_folder']}") == 0:
+    if os.system(f"unzip -q {val_zip_path} -d {config['destination_folder']}") == 0:
         print(f"✓ Successfully extracted to: {config['destination_folder']}")
         os.system(f"rm {val_zip_path}")
 

@@ -14,10 +14,14 @@ fi
 case $ALGORITHM in
   "SMPLer-X")
     echo "Using SMPLer-X for inference"
-    bash scripts/prepare/SMPLer-X.sh "$VIDEO_DIR"
+    bash scripts/prepare/SMPLer-X.sh 
     ;;
   "SMPLest-X")
     echo "Using SMPLest-X for inference" 
+    ;;
+  "OSX")
+    echo "Using OSX for inference" 
+    bash scripts/prepare/OSX.sh 
     ;;
   *)
     echo "Unsupported algorithm: $ALGORITHM"
@@ -42,6 +46,11 @@ find "$VIDEO_DIR" -type f -print0 | while IFS= read -r -d '' video; do
         ;;
       "SMPLest-X")
         bash scripts/inference/SMPLest-X.sh "$video"
+        ;;
+      "OSX")
+        # bash scripts/inference/OSX.sh "$video"
+        cd utils/extraction/OSX/demo
+        conda run -n osx python demo.py --gpu 0 --img_path input.png --output_folder .
         ;;
       *)
         echo "Unsupported algorithm: $ALGORITHM"

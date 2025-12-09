@@ -1,7 +1,7 @@
 #!/bin/bash
 set -x
 
-echo "Start infering mesh model with SMPLer-X"
+echo "Start preparing SMPLer-X environment"
 conda create -n smplerx python=3.8 -y
 
 conda run -n smplerx conda install pytorch==1.11.0 torchvision==0.12.0 torchaudio==0.11.0 cudatoolkit=11.3 -c pytorch -c nvidia -y
