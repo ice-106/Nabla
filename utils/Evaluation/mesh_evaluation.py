@@ -2,6 +2,27 @@ import glob
 import os
 import torch
 import pandas as pd
+import argparse
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Evaluate MPVPE between two folders containing two set of mesh sequences (OBJ)"
+    )
+    parser.add_argument(
+        "--gt", required=True, help="Folder containing sub-folders of ground-truth OBJ frames"
+    )
+    parser.add_argument(
+        "--pred", required=True, help="Folder containing sub-folders of predicted OBJ frames"
+    )
+    parser.add_argument(
+        "--ext", default="obj", help="File extension to look for (default: obj)"
+    )
+    parser.add_argument(
+        "--outdir", default=".", help="Folder of the output csv reporting the Mean Per Vertices Position Error (MPVPE)"
+    )
+    
+    args = parser.parse_args()
+    return args
 
 def load_obj_manual(filepath):
     vertices = []
@@ -188,25 +209,8 @@ def load_sub_folders_from_folder(folder_path):
     return sorted(os.listdir(folder_path))
 
 if __name__ == "__main__":
-    import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Evaluate MPVPE between two folders containing two set of mesh sequences (OBJ)"
-    )
-    parser.add_argument(
-        "--gt", required=True, help="Folder containing sub-folders of ground-truth OBJ frames"
-    )
-    parser.add_argument(
-        "--pred", required=True, help="Folder containing sub-folders of predicted OBJ frames"
-    )
-    parser.add_argument(
-        "--ext", default="obj", help="File extension to look for (default: obj)"
-    )
-    parser.add_argument(
-        "--outdir", default=".", help="Folder of the output csv reporting the Mean Per Vertices Position Error (MPVPE)"
-    )
-    args = parser.parse_args()
-
+    args = parse_args()
     folders = load_sub_folders_from_folder(args.gt)
     # dict for keeping track MPVPEs
     scores = {"folder": [],
