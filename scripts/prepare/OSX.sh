@@ -27,3 +27,6 @@ conda run -n osx pip install numpy==1.23.5
 
 # Patch demo.py to fix filename extraction issue
 cat ../../../patches/OSX/demo.py > demo/demo.py
+
+# Patch inference.sh to fix inference loop
+cat ../../../patches/OSX/inference.sh > demo/inference.sh

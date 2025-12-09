@@ -50,7 +50,7 @@ find "$VIDEO_DIR" -type f -print0 | while IFS= read -r -d '' video; do
       "OSX")
         # bash scripts/inference/OSX.sh "$video"
         cp "$video" utils/extraction/OSX/demo/videos/$input_video.mp4
-        bash scripts/inference/OSX.sh "$input_video" mp4 30
+        bash utils/extraction/OSX/demo/inference.sh "$input_video" mp4 30
         ;;
       *)
         echo "Unsupported algorithm: $ALGORITHM"
