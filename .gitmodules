@@ -1,3 +1,9 @@
-[submodule "utils/Extraction/SMPler-X"]
-	path = utils/Extraction/SMPler-X
+[submodule "utils/extraction/SMPLer-X"]
+	path = utils/extraction/SMPLer-X
 	url = https://github.com/SMPLCap/SMPLer-X.git
+[submodule "utils/extraction/SMPLest-X"]
+	path = utils/extraction/SMPLest-X
+	url = https://github.com/SMPLCap/SMPLest-X.git
+[submodule "utils/extraction/AiOS"]
+	path = utils/extraction/AiOS
+	url = https://github.com/SMPLCap/AiOS.git
