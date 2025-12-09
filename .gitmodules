@@ -10,3 +10,6 @@
 [submodule "utils/extraction/OSX"]
 	path = utils/extraction/OSX
 	url = https://github.com/IDEA-Research/OSX.git
+[submodule "utils/extraction/WiLoR"]
+	path = utils/extraction/WiLoR
+	url = https://github.com/rolpotamias/WiLoR.git
