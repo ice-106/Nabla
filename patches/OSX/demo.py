@@ -100,7 +100,7 @@ for num, indice in enumerate(indices):
 
     # save mesh
     save_obj(mesh, smpl_x.face, os.path.join(
-        args.output_folder, f'{frame:05}_{num}.obj'))
+        args.output_folder, f'{frame}_{num}.obj'))
 
     # render mesh
     focal = [cfg.focal[0] / cfg.input_body_shape[1] * bbox[2],
