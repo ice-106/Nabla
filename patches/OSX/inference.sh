@@ -22,14 +22,12 @@ mkdir -p $IMG_PATH
 mkdir -p $SAVE_DIR
 ffmpeg -n -i videos/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -q:v 0 images/${INPUT_VIDEO}/%06d.jpg < /dev/null 
 
-# inference
+# inference - process all images in one call (loads model and detector once)
 # Set PYTHONPATH to include OSX directory (parent of demo) so 'common' module can be found
 OSX_DIR=$(pwd)/..
-find ${IMG_PATH} -type f -name "*.jpg" -print0 | while IFS= read -r -d '' img_file; do
-    echo "Processing image: $img_file"
-    PYTHONPATH="${OSX_DIR}:${OSX_DIR}/main:${OSX_DIR}/data:$PYTHONPATH" \
-    conda run -n osx python demo.py \
-    --gpu 0 \
-    --img_path ${img_file} \
-    --output_folder ${SAVE_DIR}
-done
+echo "Processing all images in: ${IMG_PATH}"
+PYTHONPATH="${OSX_DIR}:${OSX_DIR}/main:${OSX_DIR}/data:$PYTHONPATH" \
+conda run -n osx python demo.py \
+--gpu 0 \
+--img_folder ${IMG_PATH} \
+--output_folder ${SAVE_DIR}
