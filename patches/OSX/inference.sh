@@ -23,9 +23,11 @@ mkdir -p $SAVE_DIR
 ffmpeg -n -i videos/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -q:v 0 images/${INPUT_VIDEO}/%06d.jpg < /dev/null 
 
 # inference
+# Set PYTHONPATH to include OSX directory (parent of demo) so 'common' module can be found
+OSX_DIR=$(pwd)/..
 find ${IMG_PATH} -type f -name "*.jpg" -print0 | while IFS= read -r -d '' img_file; do
     echo "Processing image: $img_file"
-    PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
+    PYTHONPATH="${OSX_DIR}:${OSX_DIR}/main:${OSX_DIR}/data:$PYTHONPATH" \
     conda run -n osx python demo.py \
     --gpu 0 \
     --img_path ${img_file} \
