@@ -23,6 +23,10 @@ case $ALGORITHM in
     echo "Using OSX for inference" 
     bash scripts/prepare/OSX.sh 
     ;;
+  "WiLoR")
+    echo "Using WiLoR for inference"
+    bash scripts/prepare/WiLoR.sh 
+    ;;
   *)
     echo "Unsupported algorithm: $ALGORITHM"
     exit 1

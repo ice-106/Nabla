@@ -17,12 +17,16 @@ LIGHT_PURPLE = (0.25098039,  0.274117647,  0.65882353)
 
 def main():
     parser = argparse.ArgumentParser(description='WiLoR demo code')
+    parser.add_argument('--img_path', type=str, default=None,
+                        help='Single input image path')
     parser.add_argument('--img_folder', type=str,
-                        default='images', help='Folder with input images')
+                        default=None, help='Folder with input images')
     parser.add_argument('--out_folder', type=str, default='out_demo',
                         help='Output folder to save rendered results')
+    parser.add_argument('--output_folder', type=str, default=None,
+                        help='Alias for out_folder (for compatibility)')
     parser.add_argument('--save_mesh', dest='save_mesh', action='store_true',
-                        default=False, help='If set, save meshes to disk also')
+                        default=True, help='If set, save meshes to disk also')
     parser.add_argument('--rescale_factor', type=float,
                         default=2.0, help='Factor for padding the bbox')
     parser.add_argument('--file_type', nargs='+', default=[
@@ -30,9 +34,15 @@ def main():
 
     args = parser.parse_args()
 
+    # Handle output_folder alias
+    if args.output_folder:
+        args.out_folder = args.output_folder
+
     # Download and load checkpoints
+    print('Loading WiLoR model...')
     model, model_cfg = load_wilor(
         checkpoint_path='./pretrained_models/wilor_final.ckpt', cfg_path='./pretrained_models/model_config.yaml')
+    print('Loading hand detector...')
     detector = YOLO('./pretrained_models/detector.pt')
     # Setup the renderer
     renderer = Renderer(model_cfg, faces=model.mano.faces)
@@ -43,17 +53,29 @@ def main():
     model = model.to(device)
     detector = detector.to(device)
     model.eval()
+    print(f'Models loaded successfully on {device}')
 
     # Make output directory if it does not exist
     os.makedirs(args.out_folder, exist_ok=True)
 
-    # Get all demo images ends with .jpg or .png
-    img_paths = [img for end in args.file_type for img in Path(
-        args.img_folder).glob(end)]
-    # Iterate over all images in folder
-    for img_path in img_paths:
+    # Get all demo images
+    if args.img_path:
+        # Single image mode
+        img_paths = [Path(args.img_path)]
+        print(f'Processing single image: {args.img_path}')
+    elif args.img_folder:
+        # Folder mode
+        img_paths = [img for end in args.file_type for img in Path(
+            args.img_folder).glob(end)]
+        print(f'Processing {len(img_paths)} images from {args.img_folder}')
+    else:
+        raise ValueError('Either --img_path or --img_folder must be specified')
+
+    # Iterate over all images
+    for idx, img_path in enumerate(img_paths, 1):
         # Extract filename without extension from img_path (same as OSX pattern)
         frame = os.path.splitext(os.path.basename(img_path))[0]
+        print(f'[{idx}/{len(img_paths)}] Processing: {frame}')
         img_cv2 = cv2.imread(str(img_path))
         detections = detector(img_cv2, conf=0.3, verbose=False)[0]
         bboxes = []
