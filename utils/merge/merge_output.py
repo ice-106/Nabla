@@ -4,7 +4,12 @@ import pickle
 import trimesh
 import argparse
 
-
+def parse_args():
+    parser = argparse.ArgumentParser(description="Merge WiLoR hands with OSX body mesh")
+    parser.add_argument('--body-data', type=str, required=True, help='Path to body data pickle file')
+    parser.add_argument('--hand-data', type=str, required=True, help='Path to hand data pickle file')
+    parser.add_argument('--output', type=str, default='merged_mesh.obj', help='Output path for merged mesh')
+    return parser.parse_args()
 
 def align_hand_to_body(hand_verts, hand_joints, hand_cam_t,
                                 body_wrist_3d, body_hand_bbox,
@@ -258,12 +263,8 @@ def merge_hands_with_body(body_data_path, hand_data_path, output_path):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--body-data', required=True)
-    parser.add_argument('--hand-data', required=True) 
-    parser.add_argument('--output', default='merged_mesh.obj')
-    
-    args = parser.parse_args()
+
+    args = parse_args()
     merge_hands_with_body(
         args.body_data,
         args.hand_data,
