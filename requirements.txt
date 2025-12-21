@@ -1,3 +1,5 @@
 gdown==5.2.0
+huggingface-hub
 torch
 pandas
+
