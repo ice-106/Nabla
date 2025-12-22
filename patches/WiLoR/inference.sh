@@ -27,5 +27,5 @@ echo "Processing all images in: ${IMG_PATH}"
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
 conda run -n wilor python demo.py \
 --img_folder ${IMG_PATH} \
---output_folder ${SAVE_DIR} \
+--out_folder ${SAVE_DIR} \
 --save_mesh
