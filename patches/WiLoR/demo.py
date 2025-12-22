@@ -17,16 +17,12 @@ LIGHT_PURPLE = (0.25098039,  0.274117647,  0.65882353)
 
 def main():
     parser = argparse.ArgumentParser(description='WiLoR demo code')
-    parser.add_argument('--img_path', type=str, default=None,
-                        help='Single input image path')
     parser.add_argument('--img_folder', type=str,
-                        default=None, help='Folder with input images')
+                        default='images', help='Folder with input images')
     parser.add_argument('--out_folder', type=str, default='out_demo',
                         help='Output folder to save rendered results')
-    parser.add_argument('--output_folder', type=str, default=None,
-                        help='Alias for out_folder (for compatibility)')
     parser.add_argument('--save_mesh', dest='save_mesh', action='store_true',
-                        default=True, help='If set, save meshes to disk also')
+                        default=False, help='If set, save meshes to disk also')
     parser.add_argument('--rescale_factor', type=float,
                         default=2.0, help='Factor for padding the bbox')
     parser.add_argument('--file_type', nargs='+', default=[
@@ -34,15 +30,9 @@ def main():
 
     args = parser.parse_args()
 
-    # Handle output_folder alias
-    if args.output_folder:
-        args.out_folder = args.output_folder
-
     # Download and load checkpoints
-    print('Loading WiLoR model...')
     model, model_cfg = load_wilor(
         checkpoint_path='./pretrained_models/wilor_final.ckpt', cfg_path='./pretrained_models/model_config.yaml')
-    print('Loading hand detector...')
     detector = YOLO('./pretrained_models/detector.pt')
     # Setup the renderer
     renderer = Renderer(model_cfg, faces=model.mano.faces)
@@ -53,29 +43,15 @@ def main():
     model = model.to(device)
     detector = detector.to(device)
     model.eval()
-    print(f'Models loaded successfully on {device}')
 
     # Make output directory if it does not exist
     os.makedirs(args.out_folder, exist_ok=True)
 
-    # Get all demo images
-    if args.img_path:
-        # Single image mode
-        img_paths = [Path(args.img_path)]
-        print(f'Processing single image: {args.img_path}')
-    elif args.img_folder:
-        # Folder mode
-        img_paths = [img for end in args.file_type for img in Path(
-            args.img_folder).glob(end)]
-        print(f'Processing {len(img_paths)} images from {args.img_folder}')
-    else:
-        raise ValueError('Either --img_path or --img_folder must be specified')
-
-    # Iterate over all images
-    for idx, img_path in enumerate(img_paths, 1):
-        # Extract filename without extension from img_path (same as OSX pattern)
-        frame = os.path.splitext(os.path.basename(img_path))[0]
-        print(f'[{idx}/{len(img_paths)}] Processing: {frame}')
+    # Get all demo images ends with .jpg or .png
+    img_paths = [img for end in args.file_type for img in Path(
+        args.img_folder).glob(end)]
+    # Iterate over all images in folder
+    for img_path in img_paths:
         img_cv2 = cv2.imread(str(img_path))
         detections = detector(img_cv2, conf=0.3, verbose=False)[0]
         bboxes = []
@@ -120,6 +96,9 @@ def main():
             # Render the result
             batch_size = batch['img'].shape[0]
             for n in range(batch_size):
+                # Get filename from path img_path
+                img_fn, _ = os.path.splitext(os.path.basename(img_path))
+
                 verts = out['pred_vertices'][n].detach().cpu().numpy()
                 joints = out['pred_keypoints_3d'][n].detach().cpu().numpy()
 
@@ -142,7 +121,7 @@ def main():
                     tmesh = renderer.vertices_to_trimesh(
                         verts, camera_translation, LIGHT_PURPLE, is_right=is_right)
                     tmesh.export(os.path.join(
-                        args.out_folder, f'{frame}_{n}.obj'))
+                        args.out_folder, f'{img_fn}_{n}.obj'))
 
         # Render front view
         if len(all_verts) > 0:
@@ -162,7 +141,50 @@ def main():
                 1-cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
 
             cv2.imwrite(os.path.join(args.out_folder,
-                        f'{frame}.jpg'), 255*input_img_overlay[:, :, ::-1])
+                        f'{img_fn}.jpg'), 255*input_img_overlay[:, :, ::-1])
+        # Add this at the end of the main() function in WiLoR demo:
+        if len(all_verts) > 0:
+            # Save hand data for merging
+            hand_data_path = save_hand_data_for_merge(
+                all_verts, all_cam_t, all_right, all_joints,
+                img_path, args.out_folder
+            )
+            print(f"Saved hand data to {hand_data_path}")
+
+# Add this to the WiLoR demo code after the main processing loop
+
+
+def save_hand_data_for_merge(all_verts, all_cam_t, all_right, all_joints, img_path, out_folder):
+    """Save hand mesh data in a format suitable for merging with body"""
+    import pickle
+
+    img_fn = os.path.splitext(os.path.basename(img_path))[0]
+
+    hand_data = {
+        'left_hands': [],
+        'right_hands': [],
+        'left_joints': [],
+        'right_joints': [],
+        'left_cam_t': [],
+        'right_cam_t': []
+    }
+
+    for i, (verts, cam_t, is_right, joints) in enumerate(zip(all_verts, all_cam_t, all_right, all_joints)):
+        if is_right:
+            hand_data['right_hands'].append(verts)
+            hand_data['right_joints'].append(joints)
+            hand_data['right_cam_t'].append(cam_t)
+        else:
+            hand_data['left_hands'].append(verts)
+            hand_data['left_joints'].append(joints)
+            hand_data['left_cam_t'].append(cam_t)
+
+    # Save as pickle for merging
+    pkl_path = os.path.join(out_folder, f'{img_fn}_hand_data.pkl')
+    with open(pkl_path, 'wb') as f:
+        pickle.dump(hand_data, f)
+
+    return pkl_path
 
 
 def project_full_img(points, cam_trans, focal_length, img_res):
