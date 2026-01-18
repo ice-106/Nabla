@@ -20,7 +20,11 @@ SAVE_DIR=results/${INPUT_VIDEO}
 # video to images
 mkdir -p $IMG_PATH
 mkdir -p $SAVE_DIR
-ffmpeg -n -i videos/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -q:v 0 images/${INPUT_VIDEO}/%06d.jpg < /dev/null 
+
+if [ "$FORMAT" == "mp4" ]; then
+    FORMAT="mp4"
+    ffmpeg -n -i videos/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -q:v 0 images/${INPUT_VIDEO}/%06d.jpg < /dev/null 
+fi
 
 # inference - process all images in one call (loads model and detector once)
 # Set PYTHONPATH to include OSX directory (parent of demo) so 'common' module can be found

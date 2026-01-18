@@ -4,8 +4,9 @@ set -x
 ALGORITHM=$1
 VIDEO_DIR=$2
 # The video names should be provided without the extension (e.g., trimmed_2025_03_31_batch_2_C0229 not trimmed_2025_03_31_batch_2_C0229.mp4).
-SKIP_VIDEOS=$3  
-INPUT_VIDEO=$(echo "$VIDEO_DIR" | sed -E 's|.*data/val_videos/||; s|\.[^.]+$||')
+FORMAT=$3
+SKIP_VIDEOS=$4  
+INPUT_VIDEO=$(echo "$VIDEO_DIR" | sed -E 's|.*data/||; s|\.[^.]+$||')
 
 # Check if video directory exists
 if [ ! -d "$VIDEO_DIR" ]; then
@@ -19,26 +20,25 @@ should_skip() {
     if [ -z "$SKIP_VIDEOS" ]; then
         return 1  # Don't skip if no skip list provided
     fi
-    # Check if video_name is in the comma-separated skip list
-    echo ",$SKIP_VIDEOS," | grep -q ",$video_name,"
-    return $?
+  # Robust membership check that tolerates spaces and avoids regex edge cases
+  case ",$SKIP_VIDEOS," in
+    *",${video_name},"*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 case $ALGORITHM in
   "SMPLer-X")
     echo "Using SMPLer-X for inference"
-    bash scripts/prepare/SMPLer-X.sh 
     ;;
   "SMPLest-X")
     echo "Using SMPLest-X for inference" 
     ;;
   "OSX")
     echo "Using OSX for inference" 
-    bash scripts/prepare/OSX.sh 
     ;;
   "WiLoR")
-    echo "Using WiLoR for inference"
-    bash scripts/prepare/WiLoR.sh 
+    echo "Using WiLoR for inference" 
     ;;
   *)
     echo "Unsupported algorithm: $ALGORITHM"
@@ -46,13 +46,15 @@ case $ALGORITHM in
     ;;
 esac
 
-# Iterate through all videos in the data/val_videos folder
-find "$VIDEO_DIR" -type f -print0 | while IFS= read -r -d '' video; do
-    # Skip if not a file
-    if [ ! -f "$video" ]; then
+while IFS= read -r -d '' folder; do
+    input_video=$(basename "$folder")
+
+     # Check if this video should be skipped
+    if should_skip "$input_video"; then
+        echo "Skipping video (already processed): $input_video"
         continue
     fi
-    input_video=$(echo "$video" | sed -E 's|.*data/val_videos/||; s|\.[^.]+$||')
+    
     
     # Check if this video should be skipped
     if should_skip "$input_video"; then
@@ -64,25 +66,22 @@ find "$VIDEO_DIR" -type f -print0 | while IFS= read -r -d '' video; do
     
     case $ALGORITHM in
       "SMPLer-X")
-        cp "$video" utils/extraction/SMPLer-X/demo/videos/$input_video.mp4
-        bash utils/extraction/SMPLer-X/main/slurm_inference.sh "$input_video" mp4 30 smpler_x_h32
+        bash utils/extraction/SMPLer-X/main/slurm_inference.sh "$input_video" "$FORMAT" 30 smpler_x_h32
         ;;
       "SMPLest-X")
-        bash scripts/inference/SMPLest-X.sh "$video"
+        bash scripts/inference/SMPLest-X.sh "$folder"
         ;;
       "OSX")
-        # bash scripts/inference/OSX.sh "$video"
-        cp "$video" utils/extraction/OSX/demo/videos/$input_video.mp4
-        bash utils/extraction/OSX/demo/inference.sh "$input_video" mp4 30
+        bash utils/extraction/OSX/demo/inference.sh "$input_video" "$FORMAT" 30
         ;;
       "WiLoR")
-        bash scripts/inference/WiLoR.sh "$video"
+        bash utils/extraction/WiLoR/inference.sh "$input_video" "$FORMAT" 30
         ;;
       *)
         echo "Unsupported algorithm: $ALGORITHM"
         exit 1
         ;;
     esac
-done
+done < <(find "$VIDEO_DIR" -mindepth 1 -maxdepth 1 -type d -print0)
 
 echo "All videos processed"

@@ -49,6 +49,7 @@ def main():
     # Get all demo images ends with .jpg or .png
     img_paths = [img for end in args.file_type for img in Path(
         args.img_folder).glob(end)]
+
     # Iterate over all images in folder
     for img_path in img_paths:
         img_cv2 = cv2.imread(str(img_path))

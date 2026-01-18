@@ -13,8 +13,6 @@ import numpy as np
 import torchvision.transforms as transforms
 import torch.backends.cudnn as cudnn
 import torch
-sys.path.insert(0, osp.join('..', 'main'))
-sys.path.insert(0, osp.join('..', 'data'))
 
 
 def parse_args():
@@ -177,7 +175,7 @@ def process_image(img_path, output_folder, demoer, detector, transform):
         body_data['left_elbow_3d'] = left_elbow_3d
         body_data['right_elbow_3d'] = right_elbow_3d
 
-        pkl_path = os.path.join(output_folder, f'person_{num}_body_data.pkl')
+        pkl_path = os.path.join(output_folder, f'{frame}_{num}_body_data.pkl')
         with open(pkl_path, 'wb') as f:
             pickle.dump(body_data, f)
 
@@ -214,13 +212,20 @@ def process_image(img_path, output_folder, demoer, detector, transform):
     vis_kpts = vis_keypoints(vis_kpts, joint_proj)
 
     # Save the data
-    save_body_data_for_merge(
+    body_data_path = save_body_data_for_merge(
         mesh, joints_3d, joint_proj, cam_trans,
         left_wrist_3d, right_wrist_3d,
         left_hand_bbox_3d, right_hand_bbox_3d,
         num, args.output_folder
     )
 
+    # Save body data for merging
+    body_data_path = save_body_data_for_merge(
+        mesh, joints_3d, joint_proj, cam_trans,
+        left_wrist_3d, right_wrist_3d,
+        left_hand_bbox_3d, right_hand_bbox_3d,
+        num, args.output_folder
+    )
     # save rendered image
     cv2.imwrite(os.path.join(output_folder,
                 f'{frame}_render.jpg'), vis_mesh[:, :, ::-1])
@@ -252,8 +257,7 @@ transform = transforms.ToTensor()
 if args.img_folder:
     # Process all images in folder
     import glob
-    img_paths = sorted(glob.glob(osp.join(args.img_folder, '*.jpg')) +
-                       glob.glob(osp.join(args.img_folder, '*.png')))
+    img_paths = sorted(glob.glob(osp.join(args.img_folder, '*.jpg')))
     print(f'Processing {len(img_paths)} images from {args.img_folder}')
     for img_path in img_paths:
         print(f'Processing: {img_path}')
