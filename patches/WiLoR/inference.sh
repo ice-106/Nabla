@@ -12,7 +12,7 @@ GPUS_PER_NODE=$((${GPUS}<8?${GPUS}:8))
 CPUS_PER_TASK=4 # ${CPUS_PER_TASK:-2}
 SRUN_ARGS=${SRUN_ARGS:-""}
 
-cd utils/extraction/WiLoR/demo
+cd utils/extraction/WiLoR
 
 IMG_PATH=images/${INPUT_VIDEO}
 SAVE_DIR=results/${INPUT_VIDEO}
@@ -24,7 +24,7 @@ ffmpeg -n -i videos/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -q:v 0 i
 
 # inference - process all images in one call (loads models once)
 echo "Processing all images in: ${IMG_PATH}"
-PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
+PYTHONPATH="$(dirname $0)":$PYTHONPATH \
 conda run -n wilor python demo.py \
 --img_folder ${IMG_PATH} \
 --out_folder ${SAVE_DIR} \
