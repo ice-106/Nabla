@@ -36,6 +36,10 @@ case $ALGORITHM in
     echo "Using OSX for inference" 
     bash scripts/prepare/OSX.sh 
     ;;
+  "WiLoR")
+    echo "Using WiLoR for inference"
+    bash scripts/prepare/WiLoR.sh 
+    ;;
   *)
     echo "Unsupported algorithm: $ALGORITHM"
     exit 1
@@ -70,6 +74,9 @@ find "$VIDEO_DIR" -type f -print0 | while IFS= read -r -d '' video; do
         # bash scripts/inference/OSX.sh "$video"
         cp "$video" utils/extraction/OSX/demo/videos/$input_video.mp4
         bash utils/extraction/OSX/demo/inference.sh "$input_video" mp4 30
+        ;;
+      "WiLoR")
+        bash scripts/inference/WiLoR.sh "$video"
         ;;
       *)
         echo "Unsupported algorithm: $ALGORITHM"
