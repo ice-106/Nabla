@@ -7,3 +7,6 @@
 [submodule "utils/extraction/AiOS"]
 	path = utils/extraction/AiOS
 	url = https://github.com/SMPLCap/AiOS.git
+[submodule "utils/extraction/OSX"]
+	path = utils/extraction/OSX
+	url = https://github.com/IDEA-Research/OSX.git
