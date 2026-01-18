@@ -24,7 +24,7 @@ ffmpeg -n -i videos/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -q:v 0 i
 
 # inference - process all images in one call (loads models once)
 echo "Processing all images in: ${IMG_PATH}"
-PYTHONPATH="$(dirname $0)":$PYTHONPATH \
+PYTHONPATH="$(pwd)":$PYTHONPATH \
 conda run -n wilor python demo.py \
 --img_folder ${IMG_PATH} \
 --out_folder ${SAVE_DIR} \

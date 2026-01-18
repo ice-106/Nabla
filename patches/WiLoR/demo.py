@@ -7,9 +7,9 @@ import numpy as np
 import json
 from typing import Dict, Optional
 
-from wilor.models import WiLoR, load_wilor
+from wilor.models import load_wilor
 from wilor.utils import recursive_to
-from wilor.datasets.vitdet_dataset import ViTDetDataset, DEFAULT_MEAN, DEFAULT_STD
+from wilor.datasets.vitdet_dataset import ViTDetDataset
 from wilor.utils.renderer import Renderer, cam_crop_to_full
 from ultralytics import YOLO
 LIGHT_PURPLE = (0.25098039,  0.274117647,  0.65882353)
@@ -36,7 +36,6 @@ def main():
     detector = YOLO('./pretrained_models/detector.pt')
     # Setup the renderer
     renderer = Renderer(model_cfg, faces=model.mano.faces)
-    renderer_side = Renderer(model_cfg, faces=model.mano.faces)
 
     device = torch.device(
         'cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -57,9 +56,9 @@ def main():
         bboxes = []
         is_right = []
         for det in detections:
-            Bbox = det.boxes.data.cpu().detach().squeeze().numpy()
+            bbox = det.boxes.data.cpu().detach().squeeze().numpy()
             is_right.append(det.boxes.cls.cpu().detach().squeeze().item())
-            bboxes.append(Bbox[:4].tolist())
+            bboxes.append(bbox[:4].tolist())
 
         if len(bboxes) == 0:
             continue
@@ -106,14 +105,11 @@ def main():
                 verts[:, 0] = (2*is_right-1)*verts[:, 0]
                 joints[:, 0] = (2*is_right-1)*joints[:, 0]
                 cam_t = pred_cam_t_full[n]
-                kpts_2d = project_full_img(
-                    verts, cam_t, scaled_focal_length, img_size[n])
 
                 all_verts.append(verts)
                 all_cam_t.append(cam_t)
                 all_right.append(is_right)
                 all_joints.append(joints)
-                all_kpts.append(kpts_2d)
 
                 # Save all meshes to disk
                 if args.save_mesh:
@@ -142,16 +138,16 @@ def main():
 
             cv2.imwrite(os.path.join(args.out_folder,
                         f'{img_fn}.jpg'), 255*input_img_overlay[:, :, ::-1])
-        # Add this at the end of the main() function in WiLoR demo:
+        #  At the end of processing each image, optionally save hand data for later merging
         if len(all_verts) > 0:
-            # Save hand data for merging
+            # Save hand data for merging with a body model later
             hand_data_path = save_hand_data_for_merge(
                 all_verts, all_cam_t, all_right, all_joints,
                 img_path, args.out_folder
             )
             print(f"Saved hand data to {hand_data_path}")
 
-# Add this to the WiLoR demo code after the main processing loop
+# Helper function to save per-image hand mesh, joint, and camera data for later merging
 
 
 def save_hand_data_for_merge(all_verts, all_cam_t, all_right, all_joints, img_path, out_folder):
@@ -169,7 +165,7 @@ def save_hand_data_for_merge(all_verts, all_cam_t, all_right, all_joints, img_pa
         'right_cam_t': []
     }
 
-    for i, (verts, cam_t, is_right, joints) in enumerate(zip(all_verts, all_cam_t, all_right, all_joints)):
+    for verts, cam_t, is_right, joints in zip(all_verts, all_cam_t, all_right, all_joints):
         if is_right:
             hand_data['right_hands'].append(verts)
             hand_data['right_joints'].append(joints)

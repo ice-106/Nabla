@@ -7,7 +7,7 @@ conda create --name wilor python=3.10
 conda run -n wilor pip install torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1
 conda run -n wilor pip install --upgrade wheel setuptools pip==22
 
-conda run -n wilor pip install -r requirements.txt
+conda run -n wilor pip install -r utils/extraction/WiLoR/requirements.txt
 
 
 pip install huggingface_hub
