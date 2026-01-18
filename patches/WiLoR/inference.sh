@@ -20,7 +20,12 @@ SAVE_DIR=results/${INPUT_VIDEO}
 # video to images
 mkdir -p $IMG_PATH
 mkdir -p $SAVE_DIR
-ffmpeg -n -i videos/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -q:v 0 images/${INPUT_VIDEO}/%06d.jpg < /dev/null 
+
+# Convert video to images if input is a video file
+if [ "$FORMAT" == "mp4" ]; then
+    ffmpeg -n -i videos/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -q:v 0 images/${INPUT_VIDEO}/%06d.jpg < /dev/null 
+fi
+
 
 # inference - process all images in one call (loads models once)
 echo "Processing all images in: ${IMG_PATH}"
@@ -28,4 +33,5 @@ PYTHONPATH="$(pwd)":$PYTHONPATH \
 conda run -n wilor python demo.py \
 --img_folder ${IMG_PATH} \
 --out_folder ${SAVE_DIR} \
+--file_type "*.${FORMAT}" \
 --save_mesh
