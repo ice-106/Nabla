@@ -214,20 +214,13 @@ def process_image(img_path, output_folder, demoer, detector, transform):
     vis_kpts = vis_keypoints(vis_kpts, joint_proj)
 
     # Save the data
-    body_data_path = save_body_data_for_merge(
+    save_body_data_for_merge(
         mesh, joints_3d, joint_proj, cam_trans,
         left_wrist_3d, right_wrist_3d,
         left_hand_bbox_3d, right_hand_bbox_3d,
         num, args.output_folder
     )
 
-    # Save body data for merging
-    body_data_path = save_body_data_for_merge(
-        mesh, joints_3d, joint_proj, cam_trans,
-        left_wrist_3d, right_wrist_3d,
-        left_hand_bbox_3d, right_hand_bbox_3d,
-        num, args.output_folder
-    )
     # save rendered image
     cv2.imwrite(os.path.join(output_folder,
                 f'{frame}_render.jpg'), vis_mesh[:, :, ::-1])
