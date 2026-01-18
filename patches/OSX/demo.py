@@ -1,206 +1,152 @@
-from pathlib import Path
-import torch
-import argparse
-import os
+from common.utils.human_models import smpl_x
+from common.utils.vis import render_mesh, save_obj, vis_keypoints
+from common.utils.preprocessing import load_img, process_bbox, generate_patch_image
+from common.base import Demoer
 import cv2
+from config import cfg
+import os
+import sys
+import os.path as osp
+import argparse
 import numpy as np
-import json
-from typing import Dict, Optional
-
-from wilor.models import WiLoR, load_wilor
-from wilor.utils import recursive_to
-from wilor.datasets.vitdet_dataset import ViTDetDataset, DEFAULT_MEAN, DEFAULT_STD
-from wilor.utils.renderer import Renderer, cam_crop_to_full
-from ultralytics import YOLO
-LIGHT_PURPLE = (0.25098039,  0.274117647,  0.65882353)
+import torchvision.transforms as transforms
+import torch.backends.cudnn as cudnn
+import torch
+sys.path.insert(0, osp.join('..', 'main'))
+sys.path.insert(0, osp.join('..', 'data'))
 
 
-def main():
-    parser = argparse.ArgumentParser(description='WiLoR demo code')
-    parser.add_argument('--img_folder', type=str,
-                        default='images', help='Folder with input images')
-    parser.add_argument('--out_folder', type=str, default='out_demo',
-                        help='Output folder to save rendered results')
-    parser.add_argument('--save_mesh', dest='save_mesh', action='store_true',
-                        default=False, help='If set, save meshes to disk also')
-    parser.add_argument('--rescale_factor', type=float,
-                        default=2.0, help='Factor for padding the bbox')
-    parser.add_argument('--file_type', nargs='+', default=[
-                        '*.jpg', '*.png', '*.jpeg'], help='List of file extensions to consider')
-
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--gpu', type=str, dest='gpu_ids', default='0')
+    parser.add_argument('--img_path', type=str, default='input.png')
+    parser.add_argument('--img_folder', type=str, default=None,
+                        help='Process all images in folder')
+    parser.add_argument('--output_folder', type=str, default='output')
+    parser.add_argument('--encoder_setting', type=str,
+                        default='osx_l', choices=['osx_b', 'osx_l'])
+    parser.add_argument('--decoder_setting', type=str, default='normal',
+                        choices=['normal', 'wo_face_decoder', 'wo_decoder'])
+    parser.add_argument('--pretrained_model_path', type=str,
+                        default='../pretrained_models/osx_l.pth.tar')
     args = parser.parse_args()
 
-    # Download and load checkpoints
-    model, model_cfg = load_wilor(
-        checkpoint_path='./pretrained_models/wilor_final.ckpt', cfg_path='./pretrained_models/model_config.yaml')
-    detector = YOLO('./pretrained_models/detector.pt')
-    # Setup the renderer
-    renderer = Renderer(model_cfg, faces=model.mano.faces)
-    renderer_side = Renderer(model_cfg, faces=model.mano.faces)
+    # test gpus
+    if not args.gpu_ids:
+        assert 0, print("Please set proper gpu ids")
 
-    device = torch.device(
-        'cuda') if torch.cuda.is_available() else torch.device('cpu')
-    model = model.to(device)
-    detector = detector.to(device)
-    model.eval()
+    if '-' in args.gpu_ids:
+        gpus = args.gpu_ids.split('-')
+        gpus[0] = int(gpus[0])
+        gpus[1] = int(gpus[1]) + 1
+        args.gpu_ids = ','.join(map(lambda x: str(x), list(range(*gpus))))
 
-    # Make output directory if it does not exist
-    os.makedirs(args.out_folder, exist_ok=True)
+    return args
 
-    # Get all demo images ends with .jpg or .png
-    img_paths = [img for end in args.file_type for img in Path(
-        args.img_folder).glob(end)]
 
-    # Iterate over all images in folder
+def process_image(img_path, output_folder, demoer, detector, transform):
+    """Process a single image"""
+    # Extract filename without extension from img_path
+    frame = osp.splitext(osp.basename(img_path))[0]
+
+    # prepare input image
+    original_img = load_img(img_path)
+    original_img_height, original_img_width = original_img.shape[:2]
+    os.makedirs(output_folder, exist_ok=True)
+
+    # detect human bbox with yolov5s
+    with torch.no_grad():
+        results = detector(original_img)
+    person_results = results.xyxy[0][results.xyxy[0][:, 5] == 0]
+    class_ids, confidences, boxes = [], [], []
+    for detection in person_results:
+        x1, y1, x2, y2, confidence, class_id = detection.tolist()
+        class_ids.append(class_id)
+        confidences.append(confidence)
+        boxes.append([x1, y1, x2 - x1, y2 - y1])
+    indices = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+    vis_mesh = original_img.copy()
+    vis_kpts = original_img.copy()
+    for num, indice in enumerate(indices):
+        bbox = boxes[indice]  # x,y,h,w
+        bbox = process_bbox(bbox, original_img_width, original_img_height)
+        img, img2bb_trans, bb2img_trans = generate_patch_image(
+            original_img, bbox, 1.0, 0.0, False, cfg.input_img_shape)
+        img = transform(img.astype(np.float32))/255
+        img = img.cuda()[None, :, :, :]
+        inputs = {'img': img}
+        targets = {}
+        meta_info = {}
+
+        # mesh recovery
+        with torch.no_grad():
+            out = demoer.model(inputs, targets, meta_info, 'test')
+
+        mesh = out['smplx_mesh_cam'].detach().cpu().numpy()
+        mesh = mesh[0]
+
+        # save mesh
+        save_obj(mesh, smpl_x.face, os.path.join(
+            output_folder, f'{frame}_{num}.obj'))
+
+        # render mesh
+        focal = [cfg.focal[0] / cfg.input_body_shape[1] * bbox[2],
+                 cfg.focal[1] / cfg.input_body_shape[0] * bbox[3]]
+        princpt = [cfg.princpt[0] / cfg.input_body_shape[1] * bbox[2] +
+                   bbox[0], cfg.princpt[1] / cfg.input_body_shape[0] * bbox[3] + bbox[1]]
+        vis_mesh = render_mesh(vis_mesh, mesh, smpl_x.face, {
+                               'focal': focal, 'princpt': princpt})
+
+        # get_2d_pts
+        joint_proj = out['smplx_joint_proj'].detach().cpu().numpy()[0]
+        joint_proj[:, 0] = joint_proj[:, 0] / \
+            cfg.output_hm_shape[2] * cfg.input_img_shape[1]
+        joint_proj[:, 1] = joint_proj[:, 1] / \
+            cfg.output_hm_shape[1] * cfg.input_img_shape[0]
+        joint_proj = np.concatenate(
+            (joint_proj, np.ones_like(joint_proj[:, :1])), 1)
+        joint_proj = np.dot(
+            bb2img_trans, joint_proj.transpose(1, 0)).transpose(1, 0)
+        vis_kpts = vis_keypoints(vis_kpts, joint_proj)
+    # save rendered image
+    cv2.imwrite(os.path.join(output_folder,
+                f'{frame}_render.jpg'), vis_mesh[:, :, ::-1])
+    cv2.imwrite(os.path.join(output_folder,
+                f'{frame}_kpts.jpg'), vis_kpts[:, :, ::-1])
+
+
+args = parse_args()
+cfg.set_args(args.gpu_ids)
+cudnn.benchmark = True
+
+# load model (once)
+cfg.set_additional_args(encoder_setting=args.encoder_setting,
+                        decoder_setting=args.decoder_setting, pretrained_model_path=args.pretrained_model_path)
+demoer = Demoer()
+demoer._make_model()
+model_path = args.pretrained_model_path
+assert osp.exists(model_path), 'Cannot find model at ' + model_path
+print('Load checkpoint from {}'.format(model_path))
+demoer.model.eval()
+
+# Load detector once
+print('Loading YOLOv5 detector...')
+detector = torch.hub.load('ultralytics/yolov5',
+                          'yolov5s', pretrained=True, verbose=False)
+transform = transforms.ToTensor()
+
+# Process images
+if args.img_folder:
+    # Process all images in folder
+    import glob
+    img_paths = sorted(glob.glob(osp.join(args.img_folder, '*.jpg')) +
+                       glob.glob(osp.join(args.img_folder, '*.png')))
+    print(f'Processing {len(img_paths)} images from {args.img_folder}')
     for img_path in img_paths:
-        img_cv2 = cv2.imread(str(img_path))
-        detections = detector(img_cv2, conf=0.3, verbose=False)[0]
-        bboxes = []
-        is_right = []
-        for det in detections:
-            Bbox = det.boxes.data.cpu().detach().squeeze().numpy()
-            is_right.append(det.boxes.cls.cpu().detach().squeeze().item())
-            bboxes.append(Bbox[:4].tolist())
-
-        if len(bboxes) == 0:
-            continue
-        boxes = np.stack(bboxes)
-        right = np.stack(is_right)
-        dataset = ViTDetDataset(model_cfg, img_cv2, boxes,
-                                right, rescale_factor=args.rescale_factor)
-        dataloader = torch.utils.data.DataLoader(
-            dataset, batch_size=16, shuffle=False, num_workers=0)
-
-        all_verts = []
-        all_cam_t = []
-        all_right = []
-        all_joints = []
-        all_kpts = []
-
-        for batch in dataloader:
-            batch = recursive_to(batch, device)
-
-            with torch.no_grad():
-                out = model(batch)
-
-            multiplier = (2*batch['right']-1)
-            pred_cam = out['pred_cam']
-            pred_cam[:, 1] = multiplier*pred_cam[:, 1]
-            box_center = batch["box_center"].float()
-            box_size = batch["box_size"].float()
-            img_size = batch["img_size"].float()
-            scaled_focal_length = model_cfg.EXTRA.FOCAL_LENGTH / \
-                model_cfg.MODEL.IMAGE_SIZE * img_size.max()
-            pred_cam_t_full = cam_crop_to_full(
-                pred_cam, box_center, box_size, img_size, scaled_focal_length).detach().cpu().numpy()
-
-            # Render the result
-            batch_size = batch['img'].shape[0]
-            for n in range(batch_size):
-                # Get filename from path img_path
-                img_fn, _ = os.path.splitext(os.path.basename(img_path))
-
-                verts = out['pred_vertices'][n].detach().cpu().numpy()
-                joints = out['pred_keypoints_3d'][n].detach().cpu().numpy()
-
-                is_right = batch['right'][n].cpu().numpy()
-                verts[:, 0] = (2*is_right-1)*verts[:, 0]
-                joints[:, 0] = (2*is_right-1)*joints[:, 0]
-                cam_t = pred_cam_t_full[n]
-                kpts_2d = project_full_img(
-                    verts, cam_t, scaled_focal_length, img_size[n])
-
-                all_verts.append(verts)
-                all_cam_t.append(cam_t)
-                all_right.append(is_right)
-                all_joints.append(joints)
-                all_kpts.append(kpts_2d)
-
-                # Save all meshes to disk
-                if args.save_mesh:
-                    camera_translation = cam_t.copy()
-                    tmesh = renderer.vertices_to_trimesh(
-                        verts, camera_translation, LIGHT_PURPLE, is_right=is_right)
-                    tmesh.export(os.path.join(
-                        args.out_folder, f'{img_fn}_{n}.obj'))
-
-        # Render front view
-        if len(all_verts) > 0:
-            misc_args = dict(
-                mesh_base_color=LIGHT_PURPLE,
-                scene_bg_color=(1, 1, 1),
-                focal_length=scaled_focal_length,
-            )
-            cam_view = renderer.render_rgba_multiple(
-                all_verts, cam_t=all_cam_t, render_res=img_size[n], is_right=all_right, **misc_args)
-
-            # Overlay image
-            input_img = img_cv2.astype(np.float32)[:, :, ::-1]/255.0
-            input_img = np.concatenate([input_img, np.ones_like(
-                input_img[:, :, :1])], axis=2)  # Add alpha channel
-            input_img_overlay = input_img[:, :, :3] * (
-                1-cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
-
-            cv2.imwrite(os.path.join(args.out_folder,
-                        f'{img_fn}.jpg'), 255*input_img_overlay[:, :, ::-1])
-        # Add this at the end of the main() function in WiLoR demo:
-        if len(all_verts) > 0:
-            # Save hand data for merging
-            hand_data_path = save_hand_data_for_merge(
-                all_verts, all_cam_t, all_right, all_joints,
-                img_path, args.out_folder
-            )
-            print(f"Saved hand data to {hand_data_path}")
-
-# Add this to the WiLoR demo code after the main processing loop
-
-
-def save_hand_data_for_merge(all_verts, all_cam_t, all_right, all_joints, img_path, out_folder):
-    """Save hand mesh data in a format suitable for merging with body"""
-    import pickle
-
-    img_fn = os.path.splitext(os.path.basename(img_path))[0]
-
-    hand_data = {
-        'left_hands': [],
-        'right_hands': [],
-        'left_joints': [],
-        'right_joints': [],
-        'left_cam_t': [],
-        'right_cam_t': []
-    }
-
-    for i, (verts, cam_t, is_right, joints) in enumerate(zip(all_verts, all_cam_t, all_right, all_joints)):
-        if is_right:
-            hand_data['right_hands'].append(verts)
-            hand_data['right_joints'].append(joints)
-            hand_data['right_cam_t'].append(cam_t)
-        else:
-            hand_data['left_hands'].append(verts)
-            hand_data['left_joints'].append(joints)
-            hand_data['left_cam_t'].append(cam_t)
-
-    # Save as pickle for merging
-    pkl_path = os.path.join(out_folder, f'{img_fn}_hand_data.pkl')
-    with open(pkl_path, 'wb') as f:
-        pickle.dump(hand_data, f)
-
-    return pkl_path
-
-
-def project_full_img(points, cam_trans, focal_length, img_res):
-    camera_center = [img_res[0] / 2., img_res[1] / 2.]
-    K = torch.eye(3)
-    K[0, 0] = focal_length
-    K[1, 1] = focal_length
-    K[0, 2] = camera_center[0]
-    K[1, 2] = camera_center[1]
-    points = points + cam_trans
-    points = points / points[..., -1:]
-
-    V_2d = (K @ points.T).T
-    return V_2d[..., :-1]
-
-
-if __name__ == '__main__':
-    main()
+        print(f'Processing: {img_path}')
+        process_image(img_path, args.output_folder,
+                      demoer, detector, transform)
+else:
+    # Process single image
+    process_image(args.img_path, args.output_folder,
+                  demoer, detector, transform)
