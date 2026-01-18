@@ -2,7 +2,7 @@
 set -x
 
 echo "Start preparing WiLoR environment"
-conda create --name wilor python=3.10
+conda create --name wilor python=3.10 -y
 
 conda run -n wilor pip install torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1
 conda run -n wilor pip install --upgrade wheel setuptools pip==22
