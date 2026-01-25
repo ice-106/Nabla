@@ -20,6 +20,9 @@ def parse_args():
     parser.add_argument(
         "--outdir", default=".", help="Folder of the output csv reporting the Mean Per Vertices Position Error (MPVPE)"
     )
+    parser.add_argument(
+        "--model", default="OSX", help="Extrrction model name for folder managemetn"
+    )
     
     args = parser.parse_args()
     return args
@@ -39,13 +42,15 @@ def load_obj_manual(filepath):
                 continue
 
             prefix = parts[0]
-            data = [float(x) for x in parts[1:]]
 
             if prefix == "v":
+                data = [float(x) for x in parts[1:]]
                 vertices.append(data)
             elif prefix == "vt":
+                data = [float(x) for x in parts[1:]]
                 texture_coords.append(data)
             elif prefix == "vn":
+                data = [float(x) for x in parts[1:]]
                 normals.append(data)
             elif prefix == "f":
                 # Faces can have different formats (e.g., v, v/vt, v/vt/vn)
@@ -208,6 +213,48 @@ def compute_mpvpe_with_rigid_align(mesh_gt, mesh_out, return_per_frame=False):
 def load_sub_folders_from_folder(folder_path):
     return sorted(os.listdir(folder_path))
 
+def load_mesh_sequence_from_folder_with_suffix(folderpath, suffix="_out.obj", expect_v=None):
+    """
+    Load all mesh files with suffix `suffix` from `folderpath`, sorted by filename.
+    Only the vertex positions are extracted (lines starting with 'v').
+
+    Returns:
+        Tensor of shape (F, V, 3) where F = number of files (frames),
+        V = number of vertices per mesh.
+
+    If `expect_v` is provided, asserts that each mesh contains that many vertices.
+    """
+    pattern = os.path.join(folderpath, f"*{suffix}")
+    files = sorted(glob.glob(pattern))
+    if len(files) == 0:
+        raise FileNotFoundError(f"No '*{suffix}' files found in {folderpath}")
+
+    frames = []
+    for fp in files:
+        obj = load_obj_manual(fp)
+        verts = obj.get("vertices", None)
+        if verts is None:
+            raise ValueError(f"No vertices found in {fp}")
+        verts = torch.tensor(verts, dtype=torch.float32)
+        if verts.dim() != 2 or verts.shape[1] != 3:
+            raise ValueError(f"Vertices in {fp} have unexpected shape {verts.shape}")
+        if expect_v is not None and verts.shape[0] != expect_v:
+            raise AssertionError(
+                f"Vertex count mismatch in {fp}: got {verts.shape[0]}, expected {expect_v}"
+            )
+        frames.append(verts)
+
+    # verify consistent vertex count
+    vcount = frames[0].shape[0]
+    for i, f in enumerate(frames):
+        if f.shape[0] != vcount:
+            raise AssertionError(
+                f"Inconsistent vertex count at index {i}: {f.shape[0]} vs {vcount}"
+            )
+
+    stacked = torch.stack(frames, dim=0)  # F x V x 3
+    return stacked
+
 if __name__ == "__main__":
 
     args = parse_args()
@@ -216,19 +263,54 @@ if __name__ == "__main__":
     scores = {"folder": [],
               "score": [],
               "per_frame": []}
+    os.makedirs(args.outdir, exist_ok=True)
+    
     for folder in folders:
-        mesh_gt = load_mesh_sequence_from_folder(os.path.join(args.gt, folder), ext=args.ext)
-        mesh_out = load_mesh_sequence_from_folder(
-            os.path.join(args.pred, folder), ext=args.ext, expect_v=mesh_gt.shape[1]
-        )
+        try:
+            if args.model == "OSX":
+                mesh_gt = load_mesh_sequence_from_folder(os.path.join(args.gt, folder), ext=args.ext)
+                print(f"Loaded GT mesh sequence from {folder} with shape {mesh_gt.shape}")
+                mesh_out = load_mesh_sequence_from_folder(
+                    os.path.join(args.pred, folder), ext=args.ext, expect_v=mesh_gt.shape[1]
+                )
+                print(f"Loaded Predicted mesh sequence from {folder} with shape {mesh_out.shape}. Moel: {args.model}")
+            elif args.model == "SMPLerx":
+                mesh_gt = load_mesh_sequence_from_folder(os.path.join(args.gt, folder), ext=args.ext)
+                print(f"Loaded GT mesh sequence from {folder} with shape {mesh_gt.shape}")
+                mesh_out = load_mesh_sequence_from_folder(
+                    os.path.join(args.pred, folder, "mesh"), ext=args.ext, expect_v=mesh_gt.shape[1]
+                )
+                print(f"Loaded Predicted mesh sequence from {folder} with shape {mesh_out.shape}. Moel: {args.model}")
+            elif args.model == "OSXW":
+                mesh_gt = load_mesh_sequence_from_folder(os.path.join(args.gt, folder), ext=args.ext)
+                print(f"Loaded GT mesh sequence from {folder} with shape {mesh_gt.shape}")
+                mesh_out = load_mesh_sequence_from_folder_with_suffix(
+                    os.path.join(args.pred, folder), suffix="_out.obj", expect_v=mesh_gt.shape[1]
+                )
+                print(f"Loaded Predicted mesh sequence from {folder} with shape {mesh_out.shape}. Moel: {args.model}")
+            elif args.model == "AIOS":
+                mesh_gt = load_mesh_sequence_from_folder(os.path.join(args.gt, folder), ext=args.ext)
+                print(f"Loaded GT mesh sequence from {folder} with shape {mesh_gt.shape}")
+                mesh_out = load_mesh_sequence_from_folder(
+                    os.path.join(args.pred, folder, "mesh"), ext=args.ext, expect_v=mesh_gt.shape[1]
+                )
+                print(f"Loaded Predicted mesh sequence from {folder} with shape {mesh_out.shape}. Moel: {args.model}")
+        except FileNotFoundError as e:
+            print(f"Info: Skipping folder '{folder}' - {e}")
+            continue
+        except Exception as e:
+            print(f"Error: Error at '{folder}' due to error - {e}")
+            raise e
 
         overall, per_frame = compute_mpvpe_with_rigid_align(
             mesh_gt, mesh_out, return_per_frame=True
         )
+        print(f"MPVPE for folder {folder}: {overall.item()}")
         scores["folder"].append(folder)
         scores["score"].append(overall.item())
         scores["per_frame"].append(per_frame.tolist())
     
     df = pd.DataFrame(scores)
     df.to_csv(os.path.join(args.outdir, "score_per_folder.csv"), index=False)
+    print(f"Saved per-folder MPVPE scores to {os.path.join(args.outdir, 'score_per_folder.csv')}")
     print(f"Mean Per Vertices Position Error: {df['score'].mean()}")
