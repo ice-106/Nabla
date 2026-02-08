@@ -3,20 +3,20 @@ set -x
 
 ALGORITHM=$1
 case $ALGORITHM in
-  "SMPLer-X")
+  "smplerx")
     echo "Preparing SMPLer-X environment for inference"
-    bash scripts/prepare/SMPLer-X.sh 
+    bash scripts/prepare/environment/SMPLer-X.sh 
     ;;
-  "SMPLest-X")
+  "smplestx")
     echo "Preparing SMPLest-X environment for inference" 
     ;;
-  "OSX")
+  "osx")
     echo "Preparing OSX environment for inference" 
-    bash scripts/prepare/OSX.sh 
+    bash scripts/prepare/environment/OSX.sh 
     ;;
-  "WiLoR")
+  "wilor")
     echo "Preparing WiLoR environment for inference" 
-    bash scripts/prepare/WiLoR.sh
+    bash scripts/prepare/environment/WiLoR.sh
     ;;
   *)
     echo "Unsupported algorithm: $ALGORITHM"
