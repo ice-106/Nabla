@@ -15,7 +15,8 @@ GPUS_PER_NODE=$((${GPUS}<8?${GPUS}:8))
 CPUS_PER_TASK=4 # ${CPUS_PER_TASK:-2}
 SRUN_ARGS=${SRUN_ARGS:-""}
 
-cd utils/extraction/SMPLer-X/main
+# CD to the directory of the script
+cd "$(dirname "$0")"
 
 IMG_PATH=../demo/images/${INPUT_VIDEO}
 SAVE_DIR=../demo/results/${INPUT_VIDEO}
