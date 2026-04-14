@@ -1,12 +1,31 @@
 #!/usr/bin/env bash
 set -x
 
+usage() {
+    echo "Usage: $(basename "$0") <ALGORITHM> <VIDEO_DIR> <FORMAT> [SKIP_VIDEOS]"
+    echo ""
+    echo "Arguments:"
+    echo "  ALGORITHM    Inference algorithm to use. One of: SMPLer-X, SMPLest-X, OSX, WiLoR"
+    echo "  VIDEO_DIR    Path to directory containing per-video subdirectories"
+    echo "  FORMAT       Video file format/extension (e.g. mp4)"
+    echo "  SKIP_VIDEOS  Optional. Comma-separated list of video names to skip (without extension)"
+    echo ""
+    echo "Examples:"
+    echo "  bash $(basename "$0") SMPLer-X data/videos mp4"
+    echo "  bash $(basename "$0") WiLoR data/videos mp4 \"video_01,video_03\""
+    exit 1
+}
+
 ALGORITHM=$1
 VIDEO_DIR=$2
 # The video names should be provided without the extension (e.g., trimmed_2025_03_31_batch_2_C0229 not trimmed_2025_03_31_batch_2_C0229.mp4).
 FORMAT=$3
-SKIP_VIDEOS=$4  
+SKIP_VIDEOS=$4
 INPUT_VIDEO=$(echo "$VIDEO_DIR" | sed -E 's|.*data/||; s|\.[^.]+$||')
+
+if [ $# -lt 3 ]; then
+    usage
+fi
 
 # Check if video directory exists
 if [ ! -d "$VIDEO_DIR" ]; then
