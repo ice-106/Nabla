@@ -84,11 +84,10 @@ def process_image(img_path, output_folder, demoer, detector, transform):
         mesh = out['smplx_mesh_cam'].detach().cpu().numpy()
         mesh = mesh[0]
 
-        # Debug line to see what's available
     print("Available outputs:", out.keys())
     smplx_joints_3d = out.get('smplx_joint_cam', None)
     mesh = out['smplx_mesh_cam'].detach().cpu().numpy()[0]
-    cam_trans = out['cam_trans'].detach().cpu().numpy()[0]  # Important!
+    cam_trans = out['cam_trans'].detach().cpu().numpy()[0]
 
     # Get the joints from SMPL-X joint regressor
     # SMPL-X has a joint regressor that maps from vertices to joints
@@ -211,14 +210,6 @@ def process_image(img_path, output_folder, demoer, detector, transform):
         bb2img_trans, joint_proj.transpose(1, 0)).transpose(1, 0)
     vis_kpts = vis_keypoints(vis_kpts, joint_proj)
 
-    # Save the data
-    body_data_path = save_body_data_for_merge(
-        mesh, joints_3d, joint_proj, cam_trans,
-        left_wrist_3d, right_wrist_3d,
-        left_hand_bbox_3d, right_hand_bbox_3d,
-        num, args.output_folder
-    )
-
     # Save body data for merging
     body_data_path = save_body_data_for_merge(
         mesh, joints_3d, joint_proj, cam_trans,
@@ -226,6 +217,30 @@ def process_image(img_path, output_folder, demoer, detector, transform):
         left_hand_bbox_3d, right_hand_bbox_3d,
         num, args.output_folder
     )
+
+    # Save SMPL-X parameters as dedicated .npz (same format as SMPLer-X)
+    smplx_pred = {}
+    smplx_pred['global_orient'] = out['smplx_root_pose'].reshape(
+        -1, 3).cpu().numpy()
+    smplx_pred['body_pose'] = out['smplx_body_pose'].reshape(
+        -1, 3).cpu().numpy()
+    smplx_pred['left_hand_pose'] = out['smplx_lhand_pose'].reshape(
+        -1, 3).cpu().numpy()
+    smplx_pred['right_hand_pose'] = out['smplx_rhand_pose'].reshape(
+        -1, 3).cpu().numpy()
+    smplx_pred['jaw_pose'] = out['smplx_jaw_pose'].reshape(-1, 3).cpu().numpy()
+    smplx_pred['leye_pose'] = np.zeros((1, 3))
+    smplx_pred['reye_pose'] = np.zeros((1, 3))
+    smplx_pred['betas'] = out['smplx_shape'].reshape(-1, 10).cpu().numpy()
+    smplx_pred['expression'] = out['smplx_expr'].reshape(-1, 10).cpu().numpy()
+    smplx_pred['transl'] = out['cam_trans'].reshape(-1, 3).cpu().numpy()
+
+    save_path_smplx = os.path.join(args.output_folder, 'smplx')
+    os.makedirs(save_path_smplx, exist_ok=True)
+    npz_path = os.path.join(save_path_smplx, f'{frame}_{num}.npz')
+    np.savez(npz_path, **smplx_pred)
+    print(f"Saved SMPL-X parameters to {npz_path}")
+
     # save rendered image
     cv2.imwrite(os.path.join(output_folder,
                 f'{frame}_render.jpg'), vis_mesh[:, :, ::-1])
