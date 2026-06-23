@@ -21,11 +21,15 @@ cd "$(dirname "$0")"
 IMG_PATH=../demo/images/${INPUT_VIDEO}
 SAVE_DIR=../demo/results/${INPUT_VIDEO}
 
-# video (or png frames) to images
 mkdir -p $IMG_PATH
 mkdir -p $SAVE_DIR
 
-end_count=$(find "$IMG_PATH" -type f -name "*.$FORMAT" | wc -l)
+# video to images
+if [ "$FORMAT" == "mp4" ]; then
+    ffmpeg -n -i Extraction/Nabla/data/code-word/${INPUT_VIDEO}.${FORMAT} -f image2 -vf fps=${FPS}/1 -q:v 0 /project/lt200449-ttsign/Extraction/Nabla/data/scraped/videos/${INPUT_VIDEO}/%06d.jpg < /dev/null 
+fi
+
+end_count=$(find "$IMG_PATH" -type f | wc -l)
 echo $end_count
 
 # inference
@@ -37,7 +41,7 @@ PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
     --agora_benchmark agora_model \
     --img_path ${IMG_PATH} \
     --start 1 \
-    --end  $end_count \
+    --end $end_count \
     --output_folder ${SAVE_DIR} \
     --show_verts \
     --show_bbox \
@@ -45,7 +49,3 @@ PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
     # --multi_person \
     # --iou_thr 0.2 \
     # --bbox_thr 20
-
-
-# images to video
-# ffmpeg -y -f image2 -r ${FPS} -i ${SAVE_DIR}/img/%06d.jpg -vcodec mjpeg -qscale 0 -pix_fmt yuv420p ../demo/results/${INPUT_VIDEO}.mp4
